@@ -26,14 +26,24 @@ function rgbToHsv(r, g, b) {
 function fuzzyLogicCalculation(age, leafColor, rainfall, soilType) {
   let ageYoung = Math.max(0, Math.min(1, (40 - age) / 40));
   let ageMature = Math.max(0, Math.min(1, age <= 30 ? 0 : age >= 70 ? 0 : age <= 50 ? (age - 30) / 20 : (70 - age) / 20));
-  let ageOld = Math.max(0, Math.min(1, (age - 50) / 50));
+  let ageOld = Math.max(0, Math.min(1, (age - 50) / 70));
   let leafYellow = Math.max(0, Math.min(1, (4 - leafColor) / 3));
   let leafMedium = Math.max(0, Math.min(1, leafColor <= 3 ? 0 : leafColor >= 8 ? 0 : leafColor <= 5.5 ? (leafColor - 3) / 2.5 : (8 - leafColor) / 2.5));
   let leafGreen = Math.max(0, Math.min(1, (leafColor - 6) / 4));
-  let rainHigh = Math.max(0, Math.min(1, (rainfall - 180) / 150));
+  let rainHigh = Math.max(0, Math.min(1, (rainfall - 180) / 320));
   let soilFactor = { 'lempung': 1.0, 'liat': 0.9, 'pasir': 1.2, 'organik': 0.8 }[soilType] || 1.0;
   const out_HighNPK = [120, 60, 80], out_MediumNPK = [80, 50, 60], out_LowN_HighPK = [40, 70, 90], out_MediumN_LowPK = [70, 40, 40], out_HighN_MediumPK = [110, 55, 70];
-  let rules = [{ strength: Math.min(ageYoung, leafYellow), output: out_HighNPK }, { strength: Math.min(ageMature, leafMedium), output: out_MediumNPK }, { strength: Math.min(ageOld, leafGreen), output: out_LowN_HighPK }, { strength: Math.min(ageYoung, leafMedium), output: out_HighN_MediumPK }, { strength: Math.min(ageMature, leafYellow), output: out_HighNPK }, { strength: Math.min(ageOld, leafMedium), output: out_MediumN_LowPK }];
+  let rules = [
+    { strength: Math.min(ageYoung, leafYellow), output: out_HighNPK },
+    { strength: Math.min(ageMature, leafMedium), output: out_MediumNPK },
+    { strength: Math.min(ageOld, leafGreen), output: out_LowN_HighPK },
+    { strength: Math.min(ageYoung, leafMedium), output: out_HighN_MediumPK },
+    { strength: Math.min(ageMature, leafYellow), output: out_HighNPK },
+    { strength: Math.min(ageOld, leafMedium), output: out_MediumN_LowPK },
+    { strength: Math.min(ageYoung, leafGreen), output: out_MediumNPK },
+    { strength: Math.min(ageMature, leafGreen), output: out_MediumN_LowPK },
+    { strength: Math.min(ageOld, leafYellow), output: out_LowN_HighPK }
+  ];
   let totalStrength = 0, weightedN = 0, weightedP = 0, weightedK = 0;
   rules.forEach(rule => {
     if (rule.strength > 0) {
@@ -175,6 +185,10 @@ function App() {
   const handleCalculate = () => {
     setIsLoading(true);
     setTimeout(() => {
+      if (plantAge > 90) {
+        alert("⚠️ Tanaman sudah melewati fase pemupukan yang efektif. Rekomendasi mungkin tidak diperlukan.");
+      }
+
       if (currentLCCValue !== null) {
         const result = fuzzyLogicCalculation(plantAge, currentLCCValue, rainfall, soilType);
         setRecommendation(result);
@@ -296,7 +310,7 @@ function App() {
               <div className="form-group">
                 <label htmlFor="rainfall">Curah Hujan (mm/bulan)</label>
                 <div className="slider-container">
-                  <input type="range" id="rainfall" min="0" max="400" value={rainfall} onChange={(e) => setRainfall(Number(e.target.value))} />
+                  <input type="range" id="rainfall" min="0" max="500" value={rainfall} onChange={(e) => setRainfall(Number(e.target.value))} />
                   <span className="slider-value">{rainfall} mm</span>
                 </div>
               </div>
@@ -374,11 +388,21 @@ const ScheduleCard = ({ recommendation, plantAge }) => {
     follow_up1: { day: 30, label: 'Pupuk Susulan I' },
     follow_up2: { day: 45, label: 'Pupuk Susulan II' },
   };
-  if (plantAge > app_times.follow_up2.day + 5) {
+  if (plantAge > app_times.follow_up2.day + 5 || plantAge > 90) {
     return (
       <div className="warning-card">
-        <strong>⚠️ Semua Jadwal Terlewat</strong>
-        <p>Tanaman sudah memasuki fase pematangan. Pemupukan pada tahap ini umumnya tidak lagi efektif dan tidak direkomendasikan.</p>
+        {plantAge > app_times.follow_up2.day + 5 && (
+          <>
+            <strong>⚠️ Semua Jadwal Terlewat</strong>
+            <p>Tanaman sudah memasuki fase pematangan. Pemupukan pada tahap ini umumnya tidak lagi efektif dan tidak direkomendasikan.</p>
+          </>
+        )}
+        {plantAge > 90 && (
+          <>
+            <strong>⚠️ Fase Pemupukan Terlambat</strong>
+            <p>Umur tanaman telah melebihi 90 HST. Pemupukan lanjutan tidak disarankan karena efektivitasnya sangat rendah.</p>
+          </>
+        )}
       </div>
     );
   }
